@@ -1,0 +1,4 @@
+$6826d36a-3c2b-471c-abf5-9090eb189a8d²Óid ÿÿÿÿÿÿÿÿÿ*int648episode ÿÿÿÿÿÿÿÿÿ*int648clip ÿÿÿÿÿÿÿÿÿ*int648#
+start_time ÿÿÿÿÿÿÿÿÿ*double8!end_time ÿÿÿÿÿÿÿÿÿ*double8 caption ÿÿÿÿÿÿÿÿÿ*string8src ÿÿÿÿÿÿÿÿÿ*string87
+vid_vector ÿÿÿÿÿÿÿÿÿ*fixed_size_list:float:140887
+cap_vector ÿÿÿÿÿÿÿÿÿ*fixed_size_list:float:14088

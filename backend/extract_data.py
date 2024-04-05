@@ -14,7 +14,7 @@ from vertexai.vision_models import (
 
 
 # An array of the video caption pairs
-clips = ['/file/path/1', '/file/path/2', '/file/path/3']
+clips = ['/Users/olivia.baldwin-geilin/clips&captions/GHOSTS_0305_FINAL_UHD_SDR_328066a1-61d1-44e0-9869-fc97f1e00b93_R0.mp4']
 
 # connect to the lancedb and define the schema
 db = lancedb.connect("./data/db")
@@ -30,7 +30,7 @@ project_id = "innovation-fest-2024"
 threshold = 0.3
 
 
-def embed_clip(video_path, location, project_id, paragraph, start_time,
+def embed_clip(video_path, location, project_id, start_time,
                end_time):
     vertexai.init(project=project_id, location=location)
 
@@ -46,7 +46,6 @@ def embed_clip(video_path, location, project_id, paragraph, start_time,
     embeddings = model.get_embeddings(
         video=video,
         video_segment_config=video_segment_config,
-        contextual_text=paragraph,
         dimension=1408,
     )
 
@@ -58,7 +57,7 @@ def embed_clip(video_path, location, project_id, paragraph, start_time,
 # inputs: 
     # clip_src: clip file 
     # threshold: threshold for scene change
-# output: [scene_change1, scenechange2, ...]
+# output: [[scene_change1_start, scene_change1_end], [scene_change2_start, scene_change2_end], ...]
 def get_timestamps(clip_src, threshold):
     # Get the timestamps of the scene changes
     cmd_file = clip_src
@@ -94,7 +93,14 @@ def get_timestamps(clip_src, threshold):
 
     vidcap.release()
 
-    return scene_changes
+    # transate the time of the scene changes to a timestamp with start and end
+    timestamps = []
+    for scene in range(len(scene_changes) - 1):
+        timestamps.append([scene_changes[scene], scene_changes[scene + 1]])
+
+    # this loses the last scene, leaving for time purposes
+
+    return timestamps
 
 
 # create a schema instance of the clip given the timestamps
@@ -108,12 +114,10 @@ def get_timestamps(clip_src, threshold):
     # project_id: project id
     # model_id: model id
 # output: Clip instance
-def createClip(clip_src, timestamps, scene_number, client, location, project_id,
-               model_id):
+def createClip(clip_src, timestamps, scene_number, location, project_id):
 
     # Embed the video
-    # TODO: ONLY EMBED THE PORTION IN THAT SCENE
-    embeds = embed_clip(clip_src, location, project_id, paragraph,
+    embeds = embed_clip(clip_src, location, project_id,
                         timestamps[0], timestamps[1])
 
     vid_vector = embeds.video_embeddings[0]
@@ -143,12 +147,16 @@ def main():
         # Get the timestamps of the scene changes
         scene_changes = get_timestamps(clip_src, threshold)
 
+        print(scene_changes)
+
+    '''
         for scene_number, timestamps in enumerate(scene_changes):
             # Create the Clip instance
-            clip = createClip(clip_src, scene_number, timestamps, client, location, project_id, model_id)
+            clip = createClip(clip_src, scene_number, timestamps, location, project_id)
 
             # Add the Clip to the database
             add_clip(clip, table)
+    '''
 
     return 
 
