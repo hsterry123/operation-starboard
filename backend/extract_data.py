@@ -1,9 +1,15 @@
 # import libraries
 import lancedb
 from schema import Clip
-from google.cloud import aiplatform
 import subprocess
 import cv2
+
+import vertexai
+from vertexai.vision_models import (
+    MultiModalEmbeddingModel,
+    Video,
+    VideoSegmentConfig,
+)
 
 
 # An array of the video caption pairs
@@ -15,52 +21,34 @@ db = lancedb.connect("./data/db")
 table = db.create_table("videos", schema=Clip,
                         exist_ok=True)
 
-# Initialize the client
-client = aiplatform.gapic.VisionServiceClient()
 
 # Specify the location of your Vertex AI resources
 location = "us-central1"
-project_id = "your-project-id"
-model_id = "your-model-id"
+project_id = "innovation-fest-2024"
 
 # Define the threshold for scene changes
 threshold = 0.3
 
 
-def embed_video(video_path, client, location, project_id, model_id):
-    # Prepare the request
-    endpoint = client.endpoint_path(
-        project=project_id, location=location, endpoint=model_id
-    )
-    parameters = aiplatform.gapic.PredictRequest(
-        endpoint=endpoint,
-        instances=[{"content": video_path}],
-    )
+def embed_clip(video_path, location, project_id, paragraph, start_time,
+               end_time):
+    vertexai.init(project=project_id, location=location)
 
-    # Send the request
-    response = client.predict(request=parameters)
+    model = MultiModalEmbeddingModel.from_pretrained("multimodalembedding")
+    video = Video.load_from_file(video_path)
 
-    # Extract the embeddings from the response
-    embeddings = [prediction.payload for prediction in response.predictions]
-
-    return embeddings
-
-
-def embed_text(text, client, location, project_id, model_id):
-    # Prepare the request
-    endpoint = client.endpoint_path(
-        project=project_id, location=location, endpoint=model_id
-    )
-    parameters = aiplatform.gapic.PredictRequest(
-        endpoint=endpoint,
-        instances=[{"content": text}],
+    video_segment_config = VideoSegmentConfig(
+        start_offset_sec=round(start_time),
+        end_offset_sec=round(end_time),
+        interval_sec=round(end_time) - round(start_time)
     )
 
-    # Send the request
-    response = client.predict(request=parameters)
-
-    # Extract the embeddings from the response
-    embeddings = [prediction.payload for prediction in response.predictions]
+    embeddings = model.get_embeddings(
+        video=video,
+        video_segment_config=video_segment_config,
+        contextual_text=paragraph,
+        dimension=1408,
+    )
 
     return embeddings
 
@@ -142,11 +130,10 @@ def createClip(clip_src, scene_changes, client, location, project_id,
 
     # Embed the video
     # TODO: ONLY EMBED THE PORTION IN THAT SCENE
-    vid_vector = embed_video(clip_src, client, location, project_id, model_id)
+    embeds = embed_clip(clip_src, location, project_id, paragraph, timestamps[0], timestamps[1])
 
-    # Embed the caption
-    cap_vector = embed_text(paragraph, client, location, project_id, model_id)
-
+    vid_vector = embeds.video_embeddings[0]
+    cap_vector = embeds.text_embedding
     # Create the Clip instance
     clip = Clip(
         id=0,       # \
