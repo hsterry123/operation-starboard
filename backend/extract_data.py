@@ -126,6 +126,8 @@ def get_timestamps(clip_src, threshold):
 # output: Clip instance
 def createClip(clip_src, start, end, scene_number, location, project_id):
 
+    print('Creating clip: ', scene_number, ' from ', clip_src)
+
     # Embed the video
     embeds = embed_clip(clip_src, location, project_id,
                         start, end)
@@ -172,8 +174,6 @@ def main():
     for clip_src in clips:
         # Get the timestamps of the scene changes
         scene_changes = get_timestamps(clip_src, threshold)
-
-        print(scene_changes)
 
         for scene_number, timestamps in enumerate(scene_changes):
             # Create the Clip instance

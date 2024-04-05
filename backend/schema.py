@@ -10,4 +10,3 @@ class Clip(LanceModel):
     caption: str
     src: str
     vid_vector: Vector(1408)
-    cap_vector: Vector(1408)
