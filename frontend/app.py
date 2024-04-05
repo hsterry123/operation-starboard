@@ -4,7 +4,7 @@ import sys
 # sys.path.append('../backend')
 # import extract_data 
 # import viewDummy
-import dummy_data
+# import dummy_data
 
 def search_videos(query, data):
     results = []
