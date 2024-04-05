@@ -1,10 +1,15 @@
 import streamlit as st
-import sys
+import lancedb
 
-# sys.path.append('../backend')
-# import extract_data 
-# import viewDummy
-# import dummy_data
+# Create or connect to the database
+@st.cache_resource
+def connect_db():
+    db = lancedb.connect("../dummy_data/db")
+    table = db.open_table("videos")
+    return table
+
+
+table = connect_db()
 
 def search_videos(query, data):
     results = []
@@ -13,6 +18,15 @@ def search_videos(query, data):
             results.append(item)
     return results
 
+def build_upload_tab(tab1): 
+    with tab1:
+      st.video(data="https://www.youtube.com/watch?v=9bZkp7q19f0")
+
+def build_data_tab(tab3):
+    with tab3:
+        st.write("Database")
+        data = table.to_pandas()
+        st.write(data)
 
 def main():
     st.title('StarBoard')
@@ -40,11 +54,11 @@ def main():
     else:
         st.write("Enter a search query.")
 
-    # tab1, tab2, tab3 = st.tabs(["Upload", "Search", "Database"])
+    tab1, tab2, tab3 = st.tabs(["Upload", "Search", "Database"])
 
-    # build_upload_tab(tab1)
+    build_upload_tab(tab1)
     # build_search_tab(tab2)
-    # build_data_tab(tab3)
+    build_data_tab(tab3)
 
 if __name__ == "__main__":
     main()
