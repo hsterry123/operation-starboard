@@ -3,7 +3,7 @@ import lancedb
 from schema import Clip
 import subprocess
 import cv2
-import datetime
+# import datetime
 
 import vertexai
 from vertexai.vision_models import (
@@ -14,7 +14,12 @@ from vertexai.vision_models import (
 
 
 # An array of the video caption pairs
-clips = ['/Users/olivia.baldwin-geilin/clips&captions/GHOSTS_0305_FINAL_UHD_SDR_328066a1-61d1-44e0-9869-fc97f1e00b93_R0.mp4']
+clips = ['/Users/alexander.johnson/Downloads/Clips/'
+         + 'GHOSTS_0305_FINAL_UHD_SDR_328066a1-61d1-44e0-9869-fc97f1e00b93_R0.mp4',
+         '/Users/alexander.johnson/Downloads/Clips/' +
+         'TRACKER_0106_ORIG_PROD_UHD_SDR_f03ddea9-716a-4ee2-ae5e-351d7e2cc99d_R0.mp4',
+         '/Users/alexander.johnson/Downloads/Clips/' +
+         'HDPPLUSJOP103A_Joe_Pickett_103_012822_MASTER.mp4']
 
 # connect to the lancedb and define the schema
 db = lancedb.connect("./data/db")
@@ -23,7 +28,7 @@ table = db.create_table("videos", schema=Clip,
 
 
 # Specify the location of your Vertex AI resources
-location = "us-central1"
+location = "us-west1-a"
 project_id = "innovation-fest-2024"
 
 # Define the threshold for scene changes
@@ -54,15 +59,17 @@ def embed_clip(video_path, location, project_id, start_time,
 
 # Timestamp function
 # - Run the video through FFMPEG to get the timestamps of the scene changes
-# inputs: 
-    # clip_src: clip file 
+# inputs:
+    # clip_src: clip file
     # threshold: threshold for scene change
-# output: [[scene_change1_start, scene_change1_end], [scene_change2_start, scene_change2_end], ...]
+# output: [[scene_change1_start, scene_change1_end], [scene_change2_start,
+# scene_change2_end], ...]
 def get_timestamps(clip_src, threshold):
     # Get the timestamps of the scene changes
     cmd_file = clip_src
-    if ' ' in cmd_file:
-        cmd_file.replace(' ', '\\ ')
+    cmd_file = cmd_file.replace(' ', '\\ ')
+
+    print(cmd_file)
 
     cmd1 = [
         'ffmpeg',
@@ -75,6 +82,9 @@ def get_timestamps(clip_src, threshold):
     cmd1 = " ".join(cmd1)
     # Run FFmpeg command
     proc = subprocess.run(cmd1, shell=True, capture_output=True)
+
+    out = proc.stderr
+    print(out)
 
     scene_changes = proc.stdout.split()
     scene_changes = [int(x.decode()) for x in scene_changes]
@@ -91,12 +101,14 @@ def get_timestamps(clip_src, threshold):
         scene_changes[i] = scene_changes[i] / fps  # time in seconds of
     # each scene change
 
-    vidcap.release()
+    end_time = vidcap.get(cv2.CAP_PROP_FRAME_COUNT) / fps
 
     # transate the time of the scene changes to a timestamp with start and end
     timestamps = []
+    timestamps.append([0, scene_changes[0]])
     for scene in range(len(scene_changes) - 1):
         timestamps.append([scene_changes[scene], scene_changes[scene + 1]])
+    timestamps.append([scene_changes[-1], end_time])
 
     # this loses the last scene, leaving for time purposes
 
@@ -105,14 +117,12 @@ def get_timestamps(clip_src, threshold):
 
 # create a schema instance of the clip given the timestamps
 # and the caption paragraph
-# inputs: 
+# inputs:
     # clip_src: clip file
     # timestamps: [scene_start_time, scene_end_time]
     # scene_number: scene number
-    # client: google cloud client
     # location: location of the vertex ai resources
     # project_id: project id
-    # model_id: model id
 # output: Clip instance
 def createClip(clip_src, timestamps, scene_number, location, project_id):
 
@@ -122,10 +132,25 @@ def createClip(clip_src, timestamps, scene_number, location, project_id):
 
     vid_vector = embeds.video_embeddings[0]
 
+    id = 0
+    ep = 0
+
+    if 'GHOSTS' in clip_src:
+        id = 61457875
+        ep = 305
+
+    elif 'TRACKER' in clip_src:
+        id = 941410057
+        ep = 106
+
+    elif 'Joe_Pickett' in clip_src:
+        id = 61465429
+        ep = 103
+
     # Create the Clip instance
     clip = Clip(
-        id=0,       # \
-        episode=0,  # | These are determined by the above
+        id=id,       # \
+        episode=ep,  # | These are determined by the above
         clip=scene_number,
         start_time=timestamps[0],
         end_time=timestamps[1],
@@ -140,6 +165,7 @@ def createClip(clip_src, timestamps, scene_number, location, project_id):
 def add_clip(clip, table):
     table.add(clip)
 
+
 def main():
 
     # Loop through each clip and caption pair and perform the necessary steps
@@ -149,16 +175,15 @@ def main():
 
         print(scene_changes)
 
-    '''
         for scene_number, timestamps in enumerate(scene_changes):
             # Create the Clip instance
-            clip = createClip(clip_src, scene_number, timestamps, location, project_id)
+            clip = createClip(clip_src, scene_number, timestamps, location,
+                              project_id)
 
             # Add the Clip to the database
             add_clip(clip, table)
-    '''
 
-    return 
+    return
 
 
 if __name__ == "__main__":
