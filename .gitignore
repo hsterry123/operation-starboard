@@ -1,0 +1,6 @@
+/data/
+/.venv
+/backend/__pycache__/
+/backend/data
+/dummy_data/
+.DS_Store
