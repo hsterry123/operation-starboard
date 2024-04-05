@@ -28,7 +28,7 @@ table = db.create_table("videos", schema=Clip,
 
 
 # Specify the location of your Vertex AI resources
-location = "us-west1-a"
+location = "us-west1"
 project_id = "innovation-fest-2024"
 
 # Define the threshold for scene changes
