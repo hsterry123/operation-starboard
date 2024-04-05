@@ -130,7 +130,8 @@ def createClip(clip_src, scene_changes, client, location, project_id,
 
     # Embed the video
     # TODO: ONLY EMBED THE PORTION IN THAT SCENE
-    embeds = embed_clip(clip_src, location, project_id, paragraph, timestamps[0], timestamps[1])
+    embeds = embed_clip(clip_src, location, project_id, paragraph,
+                        timestamps[0], timestamps[1])
 
     vid_vector = embeds.video_embeddings[0]
     cap_vector = embeds.text_embedding
