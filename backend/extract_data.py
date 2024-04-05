@@ -124,11 +124,11 @@ def get_timestamps(clip_src, threshold):
     # location: location of the vertex ai resources
     # project_id: project id
 # output: Clip instance
-def createClip(clip_src, timestamps, scene_number, location, project_id):
+def createClip(clip_src, start, end, scene_number, location, project_id):
 
     # Embed the video
     embeds = embed_clip(clip_src, location, project_id,
-                        timestamps[0], timestamps[1])
+                        start, end)
 
     vid_vector = embeds.video_embeddings[0]
 
@@ -152,8 +152,8 @@ def createClip(clip_src, timestamps, scene_number, location, project_id):
         id=id,       # \
         episode=ep,  # | These are determined by the above
         clip=scene_number,
-        start_time=timestamps[0],
-        end_time=timestamps[1],
+        start_time=start,
+        end_time=end,
         src=clip_src,
         vid_vector=vid_vector,
     )
@@ -177,8 +177,8 @@ def main():
 
         for scene_number, timestamps in enumerate(scene_changes):
             # Create the Clip instance
-            clip = createClip(clip_src, scene_number, timestamps, location,
-                              project_id)
+            clip = createClip(clip_src, scene_number, timestamps[0],
+                              timestamps[1], location, project_id)
 
             # Add the Clip to the database
             add_clip(clip, table)
