@@ -2,3 +2,5 @@ lancedb
 streamlit
 opencv-python
 vertexai
+clip
+torch
