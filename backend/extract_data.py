@@ -5,12 +5,18 @@ import subprocess
 import cv2
 # import datetime
 
-import vertexai
-from vertexai.vision_models import (
-    MultiModalEmbeddingModel,
-    Video,
-    VideoSegmentConfig,
-)
+# Import the necessary libraries
+import torch
+from PIL import Image
+import clip
+
+# import vertexai
+# from vertexai.vision_models import (
+#     MultiModalEmbeddingModel,
+#     MultiModalEmbeddingResponse,
+#     Video,
+#     VideoSegmentConfig,
+# )
 
 
 # An array of the video caption pairs
@@ -23,8 +29,7 @@ clips = ['/Users/alexander.johnson/Downloads/Clips/'
 
 # connect to the lancedb and define the schema
 db = lancedb.connect("./data/db")
-table = db.create_table("videos", schema=Clip,
-                        exist_ok=True)
+table = db.create_table("videos", schema=Clip, mode="overwrite")
 
 
 # Specify the location of your Vertex AI resources
@@ -34,27 +39,45 @@ project_id = "innovation-fest-2024"
 # Define the threshold for scene changes
 threshold = 0.3
 
+# Load the model
+# Use CUDA if available, else use CPU
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
-def embed_clip(video_path, location, project_id, start_time,
-               end_time):
-    vertexai.init(project=project_id, location=location)
+# Load the pretrained CLIP model and the associated preprocessing function
+model, preprocess = clip.load("ViT-B/32", device=device)
 
-    model = MultiModalEmbeddingModel.from_pretrained("multimodalembedding")
-    video = Video.load_from_file(video_path)
 
-    video_segment_config = VideoSegmentConfig(
-        start_offset_sec=round(start_time),
-        end_offset_sec=round(end_time),
-        interval_sec=round(end_time) - round(start_time)
-    )
+# Define a preprocessing function to convert video frames into a format
+# suitable for the model
+def preprocess_frame(frame):
+    # Convert the frame to a PIL Image and apply the preprocessing
+    return preprocess(Image.fromarray(frame))
 
-    embeddings = model.get_embeddings(
-        video=video,
-        video_segment_config=video_segment_config,
-        dimension=1408,
-    )
 
-    return embeddings
+def embed_clip(video_path, start_time):
+
+    vidcap = cv2.VideoCapture(video_path)
+
+    fps = vidcap.get(cv2.CAP_PROP_FPS)
+
+    frame_number = int(start_time * fps)
+
+    vidcap.set(cv2.CAP_PROP_POS_FRAMES, frame_number-1)
+
+    res, frame = vidcap.read()
+
+    vidcap.release()
+
+    with torch.no_grad():
+        # Preprocess the frame and add a batch dimension
+        frame_preprocessed = preprocess_frame(frame).unsqueeze(0) \
+            .to(device)
+
+        # Pass the preprocessed frame through the model to get the frame
+        # embeddings
+        embedding = model.encode_image(frame_preprocessed)
+
+    return embedding
 
 
 # Timestamp function
@@ -83,9 +106,6 @@ def get_timestamps(clip_src, threshold):
     # Run FFmpeg command
     proc = subprocess.run(cmd1, shell=True, capture_output=True)
 
-    out = proc.stderr
-    print(out)
-
     scene_changes = proc.stdout.split()
     scene_changes = [int(x.decode()) for x in scene_changes]
     subprocess.run('rm temp.mp4', shell=True)
@@ -102,6 +122,8 @@ def get_timestamps(clip_src, threshold):
     # each scene change
 
     end_time = vidcap.get(cv2.CAP_PROP_FRAME_COUNT) / fps
+
+    vidcap.release()
 
     # transate the time of the scene changes to a timestamp with start and end
     timestamps = []
@@ -124,15 +146,12 @@ def get_timestamps(clip_src, threshold):
     # location: location of the vertex ai resources
     # project_id: project id
 # output: Clip instance
-def createClip(clip_src, start, end, scene_number, location, project_id):
-
-    print('Creating clip: ', scene_number, ' from ', clip_src)
+def createClip(clip_src,  scene_number, start, end):
 
     # Embed the video
-    embeds = embed_clip(clip_src, location, project_id,
-                        start, end)
-
-    vid_vector = embeds.video_embeddings[0]
+    embeds = embed_clip(clip_src, start)
+    embeds = embeds.cpu().numpy().tolist()
+    vid_vector = embeds[0]
 
     id = 0
     ep = 0
@@ -165,7 +184,7 @@ def createClip(clip_src, start, end, scene_number, location, project_id):
 
 # insert the clip into the database
 def add_clip(clip, table):
-    table.add(clip)
+    table.add([clip])
 
 
 def main():
@@ -178,7 +197,7 @@ def main():
         for scene_number, timestamps in enumerate(scene_changes):
             # Create the Clip instance
             clip = createClip(clip_src, scene_number, timestamps[0],
-                              timestamps[1], location, project_id)
+                              timestamps[1])
 
             # Add the Clip to the database
             add_clip(clip, table)
