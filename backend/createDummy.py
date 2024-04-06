@@ -20,8 +20,8 @@ def addclips():
         start_time=i*10,
         end_time=(i+1)*10,
         caption="This is a caption",
-        src="Users/olivia.baldwin-geilin/clips&captions/TRACKER_0106_ORIG_PROD_UHD_SDR_f03ddea9-716a-4ee2-ae5e-351d7e2cc99d_R0-002.mp4",
-        vid_vector=np.random.random((1408))
+        src="/Users/olivia.baldwin-geilin/clips&captions/TRACKER_0106_ORIG_PROD_UHD_SDR_f03ddea9-716a-4ee2-ae5e-351d7e2cc99d_R0-002.mp4",
+        vid_vector=np.random.random((768))
       )
       data.append(clip)
   return data

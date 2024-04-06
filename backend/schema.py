@@ -8,4 +8,4 @@ class Clip(LanceModel):
     start_time: float
     end_time: float
     src: str
-    vid_vector: Vector(512)
+    vid_vector: Vector(768)

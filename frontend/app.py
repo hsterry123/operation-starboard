@@ -1,26 +1,63 @@
 import streamlit as st
 import lancedb
+import subprocess
+import time
+from embed import embed_text
+
+threshold = 0.7
 
 # Create or connect to the database
 @st.cache_resource
 def connect_db():
-    db = lancedb.connect("../dummy_data/db")
+    db = lancedb.connect("../data/db")
     table = db.open_table("videos")
     return table
 
 
 table = connect_db()
 
-def search_videos(query, data):
+def build_video_results(videos): 
     results = []
-    for item in data:
-        if query.lower() in item.lower():
-            results.append(item)
+    for i, video in enumerate(videos):
+      src = video['src'].replace('alexander.johnson/Downloads/Clips/', 'olivia.baldwin-geilin/clips/')
+
+      start = video['start_time']
+      end = video['end_time']
+
+      # Ignore clips that are too short or not relevant
+      if end - start < 1 or video['_distance'] < threshold:
+        continue
+
+      cmd = ['ffmpeg', '-y', '-ss', str(start), '-to', str(end), '-i', src, '-c:v', 'copy', '-c:a', 'copy', 'output'+str(i)+'.mp4']
+      cmd = " ".join(cmd)
+
+      # Run FFmpeg command
+      proc = subprocess.run(cmd, shell=True, capture_output=True)
+      # print(proc.stderr)
+
+      results.append("output"+str(i)+".mp4")
     return results
 
-def build_upload_tab(tab1): 
-    with tab1:
-      st.video(data="https://www.youtube.com/watch?v=9bZkp7q19f0")
+def search_videos(query, filters=None):
+    print(f'searching for videos with {query}...')
+    # Embed the query
+    text_embedding = embed_text(query)
+
+    text_embedding = text_embedding.detach().cpu().numpy()[0].tolist()
+    # Get the video embeddings from the database
+    if filters:
+        filter_str = str(tuple(filters)).replace(",)", ")")
+        results = table.search(text_embedding)\
+                   .where(f"id IN {filter_str}")\
+                   .metric("cosine")\
+                   .limit(20)\
+                   .to_list()
+    else: 
+        results = table.search(text_embedding)\
+                   .metric("cosine")\
+                   .limit(20)\
+                   .to_list()
+    return results
 
 def build_data_tab(tab3):
     with tab3:
@@ -33,32 +70,35 @@ def main():
     st.write("Welcome to the Video Search App." +
              " You can search for videos using text queries.")
 
-    data = []
+    # Search for user Query 
 
-    search_query = st.text_input("Search:", "")
+    search_query = st.text_input("Search:")
+    active_filter = st.toggle("Filter")
+
+    show_mappings = {61457875: 'Ghosts', 941410057: 'Tracker', 61465429: 'Joe Pickett'}
+    title_options = [61457875, 941410057, 61465429]
+
+    filters = None
+    if(active_filter):
+        filters = st.multiselect("Show Title", title_options, format_func=lambda x: show_mappings[x])
+
     if search_query:
-        results = search_videos(search_query, data)
+        results = build_video_results(search_videos(search_query, filters))
         st.subheader(f"Search Results ({len(results)}):")
         if len(results) == 0:
             st.write("No results found.")
         else:
             # display in grid
-            col1, col2, col3 = st.columns(3)
+            col1, col2 = st.columns(2)
             for i, result in enumerate(results):
-                if i % 3 == 0:
-                    col1.write(result)
-                elif i % 3 == 1:
-                    col2.write(result)
+                if i % 2 == 0:
+                    with col1:
+                        st.video(result)
                 else:
-                    col3.write(result)
+                    with col2:
+                        st.video(result)
     else:
         st.write("Enter a search query.")
-
-    tab1, tab2, tab3 = st.tabs(["Upload", "Search", "Database"])
-
-    build_upload_tab(tab1)
-    # build_search_tab(tab2)
-    build_data_tab(tab3)
 
 if __name__ == "__main__":
     main()
